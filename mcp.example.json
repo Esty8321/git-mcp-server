@@ -1,0 +1,7 @@
+
+{
+  "name": "git-mcp-server",
+  "command": "python",
+  "args": ["main.py"],
+  "cwd": "<PATH_TO_YOUR_LOCAL_CLONE>"
+}
