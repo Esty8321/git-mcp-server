@@ -11,7 +11,10 @@ from models.git_models import GitCloneIn, GitDiffIn, GitCommitIn, GitPushIn, Git
 from models.gh_models import OpenPrToBaseIn
 from models.email_models import SendEmailIn
 from settings import build_settings, get_default_env_path
-
+from utils.validate import validate_repo_dir
+from models.result import ToolResult, ErrorInfo
+from utils import errors
+    
 env_path = get_default_env_path()
 load_dotenv(dotenv_path=env_path, override=False)
 
@@ -173,11 +176,26 @@ async def open_pr_to_base(
     repo_dir_abs = res_validate["repo_dir_abs"]
     branch = await asyncio.to_thread(git.current_branch, repo_dir_abs, 20)
     if not branch:
-        return {"ok": False, "data": {}, "error": {"code": "branch_detect_failed", "message": "Failed to detect current branch.", "details": {"repo_dir": repo_dir_abs}}}
+        return ToolResult(
+            ok=False,
+            error=ErrorInfo(
+                code=errors.BRANCH_DETECT_FAILED,
+                message="Failed to detect current branch.",
+                details={"repo_dir": repo_dir_abs},
+            )
+        ).model_dump()
 
     if branch in ("main", "master"):
-        return {"ok": False, "data": {}, "error": {"code": "on_base_branch", "message": f"You are on '{branch}'. Switch to a feature branch to open a PR.", "details": {"current_branch": branch}}}
-
+        return ToolResult(
+            ok=False,
+            error=ErrorInfo(
+                code= errors.ON_BASE_BRANCH,
+                message=f"You are on '{branch}'. Switch to a feature branch to open a PR.",
+                details={"current_branch": branch}
+                
+            )
+        ).model_dump()
+        
     # ensure upstream
     has_up = await asyncio.to_thread(git.has_upstream, repo_dir_abs, 10)
     if not has_up:
@@ -190,13 +208,18 @@ async def open_pr_to_base(
 
 
 def __validate_repo_for_pr(repo_dir: str) -> dict:
-    from utils.validate import validate_repo_dir
-    from models.result import ToolResult, ErrorInfo
-    from utils import errors
+
 
     ok, repo_dir_abs = validate_repo_dir(repo_dir)
     if not ok:
-        return ToolResult(ok=False, error=ErrorInfo(code=errors.NOT_A_GIT_REPO, message="Not a git repository.", details={"repo_dir": repo_dir_abs})).model_dump()
+        return ToolResult(
+            ok=False,
+            error=ErrorInfo(
+                code=errors.NOT_A_GIT_REPO, 
+                message="Not a git repository.",
+                details={"repo_dir": repo_dir_abs}
+                )
+            ).model_dump()
     return {"ok": True, "repo_dir_abs": repo_dir_abs}
 
 
@@ -215,9 +238,9 @@ Returns ToolResult:
 - ok=true: confirmation
 - ok=false: missing SMTP config or send failure
 """)
-def send_email(to: str, subject: str, body: str) -> dict:
+async def send_email(to: str, subject: str, body: str) -> dict:
     _ = SendEmailIn(to=to, subject=subject, body=body)
-    res = email.send(to, subject, body)
+    res = await asyncio.to_thread(email.send, to, subject, body)
     return res.model_dump()
 
 

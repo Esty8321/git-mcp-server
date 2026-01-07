@@ -49,6 +49,7 @@ class EmailService:
                 error=ErrorInfo(
                     code=errors.EMAIL_SEND_FAILED,
                     message="Failed to send email.",
+                    hint="Verify SMTP_HOST/SMTP_PORT and credentials. If using TLS, ensure the port supports STARTTLS (commonly 587).",
                     details={"exception": str(e)},
                 ),
             )

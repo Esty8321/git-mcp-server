@@ -5,7 +5,7 @@ import os, subprocess, time
 
 from models.cmd_result import CmdResult
 
-DEFAULT_ENV_OVERRIDES = {#?pass it to the setting?
+DEFAULT_ENV_OVERRIDES = {
     "GIT_TERMINAL_PROMPT": "0",
     "GCM_INTERACTIVE": "Never",
     "GIT_EDITOR": "true",
@@ -57,6 +57,7 @@ def run_cmd_blocking(
         elapsed = round(time.time() - t0, 3)
     except subprocess.TimeoutExpired:
         proc.kill()
+        proc.communicate(timeout=1)
         elapsed = round(time.time() - t0, 3)
         return CmdResult(
             ok=False,

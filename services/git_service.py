@@ -80,6 +80,7 @@ class GitService:
                 error=ErrorInfo(
                     code=errors.NOT_A_GIT_REPO,
                     message="Not a git repository or repo_dir is not a directory.",
+                    hint="Pass a path to a folder that contains a .git directory (the repository root).",
                     details={"repo_dir": repo_dir_abs},
                 ),
             )
@@ -89,7 +90,11 @@ class GitService:
         if not res.ok:
             return ToolResult(
                 ok=False,
-                error=ErrorInfo(code=errors.CMD_FAILED, message="git status failed.", details=res),
+                error=ErrorInfo(
+                    code=errors.CMD_FAILED,
+                    message="git status failed.",
+                    hint="Verify Git is installed and the repo is accessible. Check stderr for details.",
+                    details=res.to_dict()),
             )
 
         return ToolResult(ok=True, data={"repo_dir": repo_dir_abs, "status_porcelain": res.stdout})
@@ -107,7 +112,12 @@ class GitService:
         if not ok:
             return ToolResult(
                 ok=False,
-                error=ErrorInfo(code=errors.NOT_A_GIT_REPO, message="Not a git repository.", details={"repo_dir": repo_dir_abs}),
+                error=ErrorInfo(
+                    code=errors.NOT_A_GIT_REPO,
+                    message="Not a git repository.", 
+                    hint="Pass the repository root folder (must contain .git).",
+                    details={"repo_dir": repo_dir_abs},
+                    ),
             )
 
         args = ["git", "diff"]
@@ -120,7 +130,15 @@ class GitService:
 
         res = run_cmd_blocking(args, cwd=repo_dir_abs, timeout_sec=timeout_sec, max_chars=max_chars)
         if not res.ok:
-            return ToolResult(ok=False, error=ErrorInfo(code=errors.CMD_FAILED, message="git diff failed.", details=res))
+            return ToolResult(
+                ok=False, 
+                error=ErrorInfo(
+                    code=errors.CMD_FAILED,
+                    message="git diff failed.", 
+                    hint="Check stderr. If the repo has no commits yet, try committing first.",
+                    details=res.to_dict(),
+                    )
+                )
 
         return ToolResult(
             ok=True,
@@ -138,18 +156,43 @@ class GitService:
     def commit(self, repo_dir: str, message: str, timeout_sec: int = 60) -> ToolResult:
         ok, repo_dir_abs = validate_repo_dir(repo_dir)
         if not ok:
-            return ToolResult(ok=False, error=ErrorInfo(code=errors.NOT_A_GIT_REPO, message="Not a git repository.", details={"repo_dir": repo_dir_abs}))
+            return ToolResult(
+                ok=False,
+                error=ErrorInfo(
+                    code=errors.NOT_A_GIT_REPO, 
+                    message="Not a git repository.",
+                    details={"repo_dir": repo_dir_abs}
+                    )
+                )
 
         status_res = run_cmd_blocking(["git", "status", "--porcelain"], cwd=repo_dir_abs, timeout_sec=timeout_sec, max_chars=4000)
         if not status_res.ok:
-            return ToolResult(ok=False, error=ErrorInfo(code=errors.CMD_FAILED, message="git status failed.", details=status_res))
+            return ToolResult(
+                ok=False, 
+                error=ErrorInfo(
+                    code=errors.CMD_FAILED,
+                    message="git status failed.",
+                    details=status_res,
+                    )
+                )
 
         if (status_res.stdout or "").strip() == "":
-            return ToolResult(ok=True, data={"repo_dir": repo_dir_abs, "message": "Nothing to commit (working tree clean)."})
+            return ToolResult(
+                ok=True,
+                data={"repo_dir": repo_dir_abs, "message": "Nothing to commit (working tree clean)."}
+                )
 
         add_res = run_cmd_blocking(["git", "add", "-A"], cwd=repo_dir_abs, timeout_sec=timeout_sec, max_chars=4000)
         if not add_res.ok:
-            return ToolResult(ok=False, error=ErrorInfo(code=errors.CMD_FAILED, message="git add failed.", details=add_res))
+            return ToolResult(
+                ok=False, 
+                error=ErrorInfo(
+                    code=errors.CMD_FAILED,
+                    message="git add failed.", 
+                    hint="Check file permissions and repo state. See stderr for details.",
+                    details=add_res,
+                    )
+                )
 
         commit_res = run_cmd_blocking(
             ["git", "commit", "-m", message, "--no-gpg-sign"],
@@ -158,9 +201,20 @@ class GitService:
             max_chars=4000,
         )
         if not commit_res.ok:
-            return ToolResult(ok=False, error=ErrorInfo(code=errors.CMD_FAILED, message="git commit failed.", details=commit_res))
+            return ToolResult(
+                ok=False, 
+                error=ErrorInfo(
+                    code=errors.CMD_FAILED,
+                    message="git commit failed.",
+                    hint="Common causes: missing user.name/user.email, hooks failing, or no staged changes. Check stderr.",
+                    details=commit_res,
+                    )
+                )
 
-        return ToolResult(ok=True, data={"repo_dir": repo_dir_abs, "message": "Commit created successfully.", "stdout": commit_res.stdout, "stderr": commit_res.stderr})
+        return ToolResult(
+            ok=True,
+            data={"repo_dir": repo_dir_abs, "message": "Commit created successfully.", "stdout": commit_res.stdout, "stderr": commit_res.stderr}
+            )
 
     def current_branch(self, repo_dir_abs: str, timeout_sec: int = 20) -> Optional[str]:
         res = run_cmd_blocking(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_dir_abs, timeout_sec=timeout_sec, max_chars=2000)
@@ -187,12 +241,27 @@ class GitService:
     ) -> ToolResult:
         ok, repo_dir_abs = validate_repo_dir(repo_dir)
         if not ok:
-            return ToolResult(ok=False, error=ErrorInfo(code=errors.NOT_A_GIT_REPO, message="Not a git repository.", details={"repo_dir": repo_dir_abs}))
+            return ToolResult(
+                ok=False,
+                error=ErrorInfo(
+                    code=errors.NOT_A_GIT_REPO, 
+                    message="Not a git repository.",
+                    details={"repo_dir": repo_dir_abs}
+                    )
+                )
 
         if not branch:
             branch = self.current_branch(repo_dir_abs, 20) or ""
             if not branch:
-                return ToolResult(ok=False, error=ErrorInfo(code=errors.BRANCH_DETECT_FAILED, message="Failed to detect current branch.", details={"repo_dir": repo_dir_abs}))
+                return ToolResult(
+                    ok=False, 
+                    error=ErrorInfo(
+                        code=errors.BRANCH_DETECT_FAILED,
+                        message="Failed to detect current branch.", 
+                        hint="Ensure the repo has at least one commit and HEAD is not detached.",
+                        details={"repo_dir": repo_dir_abs},
+                        )
+                    )
 
         args = ["git", "push"]
         if set_upstream:
