@@ -156,8 +156,6 @@ to understand failures programmatically and recover gracefully.
 
 ---
 
----
-
 ## 🚧 Future Improvements
 
 The following features would further enhance the server:
